@@ -1,0 +1,531 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS & AUTH
+// ============================================================================
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  username     String     @unique
+  displayName  String?    @map("display_name")
+  passwordHash String?    @map("password_hash")
+  role         UserRole   @default(CONTRIBUTOR)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  oauthAccounts      OAuthAccount[]
+  sessions           Session[]
+  knowledgeAssets    KnowledgeAsset[]
+  comments           Comment[]
+  correctionRequests CorrectionRequest[] @relation("CorrectionSubmitter")
+  reviewedCorrections CorrectionRequest[] @relation("CorrectionReviewer")
+  createdRelationships Relationship[]     @relation("RelationshipCreator")
+  learningPaths      LearningPath[]
+  auditEvents        AuditEvent[]
+  notifications      Notification[]
+  assetVersions      AssetVersion[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @map("user_id") @db.Uuid
+  provider   String
+  providerId String @map("provider_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("oauth_accounts")
+}
+
+model Session {
+  id        String   @id
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ============================================================================
+// KNOWLEDGE ASSETS
+// ============================================================================
+
+model KnowledgeAsset {
+  id           String               @id @default(uuid()) @db.Uuid
+  slug         String               @unique
+  title        String
+  summary      String?
+  content      String?
+  rawContent   String?              @map("raw_content")
+  status       KnowledgeAssetStatus @default(DRAFT)
+  contentType  ContentType?         @map("content_type")
+  difficulty   Difficulty?
+  authorId     String?              @map("author_id") @db.Uuid
+  categoryId   String?              @map("category_id") @db.Uuid
+  gitSha       String?              @map("git_sha")
+  version      String?
+  metadata     Json?
+  searchVector Unsupported("tsvector")? @map("search_vector")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt  DateTime?            @map("published_at") @db.Timestamptz
+  deletedAt    DateTime?            @map("deleted_at") @db.Timestamptz
+
+  author       User?                     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  category     Category?                 @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags         KnowledgeAssetTag[]
+  concepts     KnowledgeAssetConcept[]
+  references   KnowledgeAssetReference[]
+  attachments  Attachment[]
+  comments     Comment[]
+  corrections  CorrectionRequest[]
+  pathItems    LearningPathItem[]
+  versions     AssetVersion[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@index([authorId])
+  @@map("knowledge_assets")
+}
+
+// ============================================================================
+// CATEGORIES
+// ============================================================================
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  name        String
+  description String?
+  parentId    String?  @map("parent_id") @db.Uuid
+  path        String
+  depth       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  parent   Category?        @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[]       @relation("CategoryHierarchy")
+  assets   KnowledgeAsset[]
+
+  @@index([parentId])
+  @@index([path])
+  @@map("categories")
+}
+
+// ============================================================================
+// TAGS & CONCEPTS
+// ============================================================================
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  assets KnowledgeAssetTag[]
+
+  @@map("tags")
+}
+
+model KnowledgeAssetTag {
+  assetId String @map("asset_id") @db.Uuid
+  tagId   String @map("tag_id") @db.Uuid
+
+  asset KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  tag   Tag            @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, tagId])
+  @@map("knowledge_asset_tags")
+}
+
+model Concept {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  name        String
+  aliases     String[]
+  description String?
+  domain      String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  assets KnowledgeAssetConcept[]
+
+  @@map("concepts")
+}
+
+model KnowledgeAssetConcept {
+  assetId   String @map("asset_id") @db.Uuid
+  conceptId String @map("concept_id") @db.Uuid
+
+  asset   KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  concept Concept        @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, conceptId])
+  @@map("knowledge_asset_concepts")
+}
+
+// ============================================================================
+// RELATIONSHIPS
+// ============================================================================
+
+model Relationship {
+  id           String             @id @default(uuid()) @db.Uuid
+  sourceType   String             @map("source_type")
+  sourceId     String             @map("source_id") @db.Uuid
+  targetType   String             @map("target_type")
+  targetId     String             @map("target_id") @db.Uuid
+  relationship RelationshipType
+  status       RelationshipStatus @default(PROPOSED)
+  createdById  String?            @map("created_by") @db.Uuid
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  createdBy User? @relation("RelationshipCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([sourceType, sourceId])
+  @@index([targetType, targetId])
+  @@map("relationships")
+}
+
+// ============================================================================
+// REFERENCES
+// ============================================================================
+
+model Reference {
+  id        String          @id @default(uuid()) @db.Uuid
+  slug      String          @unique
+  title     String
+  authors   String[]
+  year      Int?
+  publisher String?
+  url       String?
+  doi       String?
+  refType   ReferenceType   @map("ref_type")
+  status    ReferenceStatus @default(DRAFT)
+  metadata  Json?
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  assets KnowledgeAssetReference[]
+
+  @@map("references")
+}
+
+model KnowledgeAssetReference {
+  assetId     String @map("asset_id") @db.Uuid
+  referenceId String @map("reference_id") @db.Uuid
+
+  asset     KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  reference Reference      @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, referenceId])
+  @@map("knowledge_asset_references")
+}
+
+// ============================================================================
+// ATTACHMENTS
+// ============================================================================
+
+model Attachment {
+  id          String           @id @default(uuid()) @db.Uuid
+  assetId     String           @map("asset_id") @db.Uuid
+  filename    String
+  storagePath String           @map("storage_path")
+  mimeType    String           @map("mime_type")
+  sizeBytes   BigInt?          @map("size_bytes")
+  status      AttachmentStatus @default(UPLOADED)
+  uploadedAt  DateTime         @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  asset KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+// ============================================================================
+// LEARNING PATHS
+// ============================================================================
+
+model LearningPath {
+  id                String             @id @default(uuid()) @db.Uuid
+  slug              String             @unique
+  title             String
+  description       String?
+  difficulty        Difficulty?
+  estimatedDuration Int?               @map("estimated_duration")
+  status            LearningPathStatus @default(DRAFT)
+  createdById       String?            @map("created_by") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  createdBy User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items     LearningPathItem[]
+
+  @@map("learning_paths")
+}
+
+model LearningPathItem {
+  pathId   String @map("path_id") @db.Uuid
+  assetId  String @map("asset_id") @db.Uuid
+  position Int
+
+  path  LearningPath   @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  asset KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([pathId, assetId])
+  @@map("learning_path_items")
+}
+
+// ============================================================================
+// ASSET VERSIONS
+// ============================================================================
+
+model AssetVersion {
+  id         String   @id @default(uuid()) @db.Uuid
+  assetId    String   @map("asset_id") @db.Uuid
+  rawContent String?  @map("raw_content")
+  metadata   Json?
+  gitSha     String?  @map("git_sha")
+  authorId   String?  @map("author_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  asset  KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  author User?          @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([assetId])
+  @@map("asset_versions")
+}
+
+// ============================================================================
+// COMMUNITY
+// ============================================================================
+
+model Comment {
+  id         String        @id @default(uuid()) @db.Uuid
+  assetId    String        @map("asset_id") @db.Uuid
+  parentId   String?       @map("parent_id") @db.Uuid
+  authorId   String        @map("author_id") @db.Uuid
+  content    String
+  status     CommentStatus @default(PENDING)
+  reportCount Int          @default(0) @map("report_count")
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  asset   KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  parent  Comment?       @relation("CommentThread", fields: [parentId], references: [id], onDelete: SetNull)
+  author  User           @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  replies Comment[]      @relation("CommentThread")
+
+  @@index([assetId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+// ============================================================================
+// OPERATIONS
+// ============================================================================
+
+model CorrectionRequest {
+  id           String           @id @default(uuid()) @db.Uuid
+  assetId      String           @map("asset_id") @db.Uuid
+  submittedBy  String           @map("submitted_by") @db.Uuid
+  description  String
+  suggestion   String?
+  status       CorrectionStatus @default(SUBMITTED)
+  reviewedById String?          @map("reviewed_by") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  asset      KnowledgeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  submitter  User           @relation("CorrectionSubmitter", fields: [submittedBy], references: [id], onDelete: Restrict)
+  reviewedBy User?          @relation("CorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([assetId])
+  @@index([submittedBy])
+  @@map("correction_requests")
+}
+
+model GitSyncJob {
+  id           String         @id @default(uuid()) @db.Uuid
+  repository   String
+  trigger      GitSyncTrigger
+  status       SyncStatus     @default(IDLE)
+  startedAt    DateTime?      @map("started_at") @db.Timestamptz
+  completedAt  DateTime?      @map("completed_at") @db.Timestamptz
+  errorMessage String?        @map("error_message")
+  syncedCount  Int?           @map("synced_count")
+
+  @@map("git_sync_jobs")
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id") @db.Uuid
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([resource, resourceId])
+  @@map("audit_events")
+}
+
+model Notification {
+  id        String             @id @default(uuid()) @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  type      String
+  payload   Json?
+  status    NotificationStatus @default(CREATED)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  sentAt    DateTime?          @map("sent_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model SearchQueryLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  query       String    @db.Text
+  resultCount Int?      @map("result_count")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt])
+  @@index([query])
+  @@map("search_queries")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  OWNER
+  ADMIN
+  EDITOR
+  CONTRIBUTOR
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum KnowledgeAssetStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+  DELETED
+}
+
+enum ContentType {
+  CONCEPT
+  TUTORIAL
+  RESEARCH_NOTE
+  REFERENCE_MATERIAL
+  LEARNING_NOTE
+  ARCHITECTURE_NOTE
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum RelationshipType {
+  DEPENDS_ON
+  RELATED_TO
+  USES
+  EXTENDS
+  REFERENCES
+  CONTRASTS
+}
+
+enum RelationshipStatus {
+  PROPOSED
+  VALIDATED
+  ACTIVE
+  ARCHIVED
+}
+
+enum ReferenceType {
+  BOOK
+  PAPER
+  ARTICLE
+  WEBSITE
+  DOCUMENTATION
+  STANDARD
+  VIDEO
+  COURSE
+}
+
+enum ReferenceStatus {
+  DRAFT
+  VALIDATED
+  ARCHIVED
+}
+
+enum AttachmentStatus {
+  UPLOADED
+  VALIDATED
+  AVAILABLE
+  DELETED
+}
+
+enum LearningPathStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+enum CorrectionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  IMPLEMENTED
+}
+
+enum GitSyncTrigger {
+  MANUAL
+  SCHEDULED
+  WEBHOOK
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  COMPLETED
+  FAILED
+}
+
+enum NotificationStatus {
+  CREATED
+  QUEUED
+  SENT
+  FAILED
+}

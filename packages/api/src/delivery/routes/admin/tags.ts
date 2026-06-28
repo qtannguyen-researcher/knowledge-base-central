@@ -1,0 +1,74 @@
+import type { ZodFastify } from '../../types.js';
+
+import { requirePermission } from '../../../auth/middleware.js';
+import type { Container } from '../../../container.js';
+import { idParamSchema } from '../../schemas/common.js';
+import { createTagBodySchema, updateTagBodySchema } from '../../schemas/tag.js';
+
+export async function registerAdminTagRoutes(app: ZodFastify, container: Container): Promise<void> {
+  app.get('/tags', { preHandler: requirePermission('tag:view', container) }, async () => {
+    const tags = await container.prisma.tag.findMany({
+      orderBy: { name: 'asc' },
+    });
+    return tags;
+  });
+
+  app.post(
+    '/tags',
+    {
+      preHandler: requirePermission('tag:create', container),
+      schema: { body: createTagBodySchema },
+    },
+    async (request, reply) => {
+      const body = request.body;
+      const tag = await container.prisma.tag.create({
+        data: { slug: body.slug, name: body.name },
+      });
+      return reply.status(201).send(tag);
+    },
+  );
+
+  app.put(
+    '/tags/:id',
+    {
+      preHandler: requirePermission('tag:update', container),
+      schema: { params: idParamSchema, body: updateTagBodySchema },
+    },
+    async (request, reply) => {
+      try {
+        const tag = await container.prisma.tag.update({
+          where: { id: request.params.id },
+          data: { name: request.body.name },
+        });
+        return tag;
+      } catch {
+        return reply.status(404).send({ error: 'not_found' });
+      }
+    },
+  );
+
+  app.delete(
+    '/tags/:id',
+    {
+      preHandler: requirePermission('tag:delete', container),
+      schema: { params: idParamSchema },
+    },
+    async (request, reply) => {
+      try {
+        await container.prisma.knowledgeAssetTag.deleteMany({
+          where: { tagId: request.params.id },
+        });
+        await container.prisma.tag.delete({ where: { id: request.params.id } });
+        await container.auditService.log(
+          request.session.userId,
+          'delete',
+          'tag',
+          request.params.id,
+        );
+        return reply.status(200).send({ ok: true });
+      } catch {
+        return reply.status(404).send({ error: 'not_found' });
+      }
+    },
+  );
+}

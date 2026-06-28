@@ -42,13 +42,35 @@ knowledge-base-central/
 
 ## Local Services (Docker)
 
-Start the local development services (PostgreSQL, Redis):
+Start the local development services (PostgreSQL 16, Redis 7):
 
 ```bash
 docker compose up -d
 ```
 
-> TODO: document any additional service configuration steps
+This starts:
+
+- **PostgreSQL** on port `5432` (data persisted in a named volume)
+- **Redis** on port `6379`
+
+To also start **MailHog** (local SMTP with web UI at `http://localhost:8025`):
+
+```bash
+docker compose --profile dev up -d
+```
+
+To stop all services:
+
+```bash
+docker compose down
+```
+
+For developer-specific overrides (custom ports, passwords, etc.), copy and edit the override file:
+
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+# edit docker-compose.override.yml as needed — it is git-ignored
+```
 
 ## Environment Configuration
 

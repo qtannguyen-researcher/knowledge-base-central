@@ -45,6 +45,15 @@ Thumbs.db
 # Turbo
 .turbo/
 
+# Cursor IDE
+.cursor/
+
+# pnpm store
+.pnpm-store/
+
+# Kiro
+.kiro/
+
 # Docker overrides
 docker-compose.override.yml
 
@@ -52,3 +61,6 @@ docker-compose.override.yml
 .cache/
 tmp/
 temp/
+
+# Temporary
+docs/
