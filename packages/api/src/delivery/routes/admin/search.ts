@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { SearchService } from '../../../application/search/SearchService.js';
 import { reindexQuerySchema, searchAnalyticsQuerySchema } from '../../schemas/search.js';
@@ -14,7 +14,7 @@ export async function registerAdminSearchRoutes(
   app.post(
     '/search/reindex',
     {
-      preHandler: requirePermission('search:manage', container),
+      preHandler: requirePermission(container, 'search:manage'),
       schema: { body: reindexQuerySchema },
     },
     async (_request, reply) => {
@@ -26,7 +26,7 @@ export async function registerAdminSearchRoutes(
   app.get(
     '/search/analytics',
     {
-      preHandler: requirePermission('audit:view', container),
+      preHandler: requirePermission(container, 'audit:view'),
       schema: { querystring: searchAnalyticsQuerySchema },
     },
     async (request) => {

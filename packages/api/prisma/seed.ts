@@ -5,26 +5,20 @@ import {
   UserRole,
 } from '@knowledge-base-central/shared';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const ownerPassword = process.env['SEED_OWNER_PASSWORD'] ?? 'change-me-in-production';
-  const passwordHash = await bcrypt.hash(ownerPassword, 12);
-
   const owner = await prisma.user.upsert({
     where: { email: 'owner@knowledge-base.local' },
     create: {
       email: 'owner@knowledge-base.local',
       username: 'owner',
       displayName: 'Platform Owner',
-      passwordHash,
       role: UserRole.OWNER,
       status: 'ACTIVE',
     },
     update: {
-      passwordHash,
       role: UserRole.OWNER,
       status: 'ACTIVE',
     },

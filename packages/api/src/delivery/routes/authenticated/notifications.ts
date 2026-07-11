@@ -1,7 +1,7 @@
 import type { ZodFastify } from '../../types.js';
 
 import type { Container } from '../../../container.js';
-import { requireAuth } from '../../../auth/middleware.js';
+import { requireAuth } from '../../../auth.js';
 import { paginationQuerySchema, notificationIdParamSchema } from '../../schemas/community.js';
 
 export async function registerUserNotificationRoutes(
@@ -14,10 +14,10 @@ export async function registerUserNotificationRoutes(
       schema: {
         querystring: paginationQuerySchema,
       },
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
     async (request, _reply) => {
-      const userId = request.session.userId!;
+      const userId = request.user!.id;
       const { page = 1, limit = 20 } = request.query;
       const skip = (page - 1) * limit;
 
@@ -50,11 +50,11 @@ export async function registerUserNotificationRoutes(
     '/users/me/notifications/:id/read',
     {
       schema: { params: notificationIdParamSchema },
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { id } = request.params;
-      const userId = request.session.userId!;
+      const userId = request.user!.id;
 
       const notification = await container.prisma.notification.findUnique({
         where: { id },
@@ -71,10 +71,10 @@ export async function registerUserNotificationRoutes(
   app.post(
     '/users/me/notifications/read-all',
     {
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
-    async (request, reply) => {
-      const userId = request.session.userId!;
+    async (request, _reply) => {
+      const userId = request.user!.id;
 
       await container.prisma.notification.updateMany({
         where: { userId },

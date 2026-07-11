@@ -19,3 +19,12 @@ export type {
 
 export { SyncStatus } from './types/sync.js';
 export type { SyncStatus as SyncStatusType } from './types/sync.js';
+
+// Identity Service user type (standardized across services)
+export interface IdentityServiceUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+}

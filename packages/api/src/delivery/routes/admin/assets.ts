@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { KnowledgeAsset } from '../../../domain/knowledge-asset/KnowledgeAsset.js';
 import { handleDomainError, slugify, toAssetJson } from '../../helpers.js';
@@ -40,7 +40,7 @@ export async function registerAdminAssetRoutes(
   app.post(
     '/assets',
     {
-      preHandler: requirePermission('article:create', container),
+      preHandler: requirePermission(container, 'article:create'),
       schema: { body: createAssetBodySchema },
     },
     async (request, reply) => {
@@ -55,7 +55,7 @@ export async function registerAdminAssetRoutes(
         content: body.content ?? null,
         rawContent: body.rawContent ?? null,
         metadata: body.metadata ?? null,
-        authorId: request.session.userId ?? null,
+        authorId: request.user?.id ?? null,
       });
 
       await container.knowledgeAssetRepository.save(asset);
@@ -70,7 +70,7 @@ export async function registerAdminAssetRoutes(
   app.get(
     '/assets',
     {
-      preHandler: requirePermission('article:view', container),
+      preHandler: requirePermission(container, 'article:view'),
       schema: { querystring: adminListAssetsQuerySchema },
     },
     async (request) => {
@@ -95,7 +95,7 @@ export async function registerAdminAssetRoutes(
   app.get(
     '/assets/:id',
     {
-      preHandler: requirePermission('article:view', container),
+      preHandler: requirePermission(container, 'article:view'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -110,7 +110,7 @@ export async function registerAdminAssetRoutes(
   app.put(
     '/assets/:id',
     {
-      preHandler: requirePermission('article:update', container),
+      preHandler: requirePermission(container, 'article:update'),
       schema: { params: idParamSchema, body: updateAssetBodySchema },
     },
     async (request, reply) => {
@@ -125,7 +125,7 @@ export async function registerAdminAssetRoutes(
           existing.id,
           existing.rawContent,
           existing.metadata,
-          request.session.userId,
+          request.user?.id,
         );
       }
 
@@ -148,7 +148,7 @@ export async function registerAdminAssetRoutes(
   app.delete(
     '/assets/:id',
     {
-      preHandler: requirePermission('article:delete', container),
+      preHandler: requirePermission(container, 'article:delete'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -161,7 +161,7 @@ export async function registerAdminAssetRoutes(
         const deleted = existing.softDelete();
         await container.knowledgeAssetRepository.save(deleted);
         await container.auditService.log(
-          request.session.userId,
+          request.user?.id,
           'delete',
           'knowledge_asset',
           existing.id,
@@ -216,7 +216,7 @@ export async function registerAdminAssetRoutes(
     app.post(
       route.path,
       {
-        preHandler: requirePermission(route.permission, container),
+        preHandler: requirePermission(container, route.permission),
         schema: { params: idParamSchema },
       },
       async (request, reply) => {
@@ -229,7 +229,7 @@ export async function registerAdminAssetRoutes(
           const updated = route.transition(existing);
           await container.knowledgeAssetRepository.save(updated);
           await container.auditService.log(
-            request.session.userId,
+            request.user?.id,
             route.action,
             'knowledge_asset',
             existing.id,
@@ -246,7 +246,7 @@ export async function registerAdminAssetRoutes(
   app.get(
     '/assets/:id/versions',
     {
-      preHandler: requirePermission('article:view', container),
+      preHandler: requirePermission(container, 'article:view'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -268,7 +268,7 @@ export async function registerAdminAssetRoutes(
   app.get(
     '/assets/:id/versions/:versionId',
     {
-      preHandler: requirePermission('article:view', container),
+      preHandler: requirePermission(container, 'article:view'),
       schema: { params: versionIdParamSchema },
     },
     async (request, reply) => {
@@ -294,7 +294,7 @@ export async function registerAdminAssetRoutes(
   app.post(
     '/assets/:id/versions/:versionId/restore',
     {
-      preHandler: requirePermission('article:update', container),
+      preHandler: requirePermission(container, 'article:update'),
       schema: { params: versionIdParamSchema },
     },
     async (request, reply) => {
@@ -315,7 +315,7 @@ export async function registerAdminAssetRoutes(
         existing.id,
         existing.rawContent,
         existing.metadata as Record<string, unknown> | null,
-        request.session.userId,
+        request.user?.id,
       );
 
       const restored = existing.update({
@@ -324,7 +324,7 @@ export async function registerAdminAssetRoutes(
       });
       await container.knowledgeAssetRepository.save(restored);
       await container.auditService.log(
-        request.session.userId,
+        request.user?.id,
         'restore_version',
         'knowledge_asset',
         existing.id,
@@ -338,7 +338,7 @@ export async function registerAdminAssetRoutes(
   app.post(
     '/assets/:id/concepts',
     {
-      preHandler: requirePermission('concept:update', container),
+      preHandler: requirePermission(container, 'concept:update'),
       schema: { params: idParamSchema, body: linkConceptBodySchema },
     },
     async (request, reply) => {
@@ -369,7 +369,7 @@ export async function registerAdminAssetRoutes(
   app.delete(
     '/assets/:id/concepts/:conceptId',
     {
-      preHandler: requirePermission('concept:update', container),
+      preHandler: requirePermission(container, 'concept:update'),
       schema: { params: conceptLinkParamSchema },
     },
     async (request, reply) => {
@@ -386,7 +386,7 @@ export async function registerAdminAssetRoutes(
   app.post(
     '/assets/:id/references',
     {
-      preHandler: requirePermission('reference:update', container),
+      preHandler: requirePermission(container, 'reference:update'),
       schema: { params: idParamSchema, body: linkReferenceBodySchema },
     },
     async (request, reply) => {
@@ -417,7 +417,7 @@ export async function registerAdminAssetRoutes(
   app.delete(
     '/assets/:id/references/:refId',
     {
-      preHandler: requirePermission('reference:update', container),
+      preHandler: requirePermission(container, 'reference:update'),
       schema: { params: referenceLinkParamSchema },
     },
     async (request, reply) => {
@@ -435,7 +435,7 @@ export async function registerAdminAssetRoutes(
   app.get(
     '/assets/:id/git-history',
     {
-      preHandler: requirePermission('article:view', container),
+      preHandler: requirePermission(container, 'article:view'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {

@@ -2,7 +2,7 @@ import type { ZodFastify } from '../../types.js';
 
 import type { Container } from '../../../container.js';
 import { UserRole } from '@knowledge-base-central/shared';
-import { requireAuth } from '../../../auth/middleware.js';
+import { requireAuth } from '../../../auth.js';
 import { slugParamSchema, paginationQuerySchema } from '../../schemas/common.js';
 import { createCorrectionBodySchema } from '../../schemas/community.js';
 import { sanitizeText } from '../../../infrastructure/sanitization/textSanitizer.js';
@@ -21,12 +21,12 @@ export async function registerAuthenticatedCorrectionRoutes(
         params: slugParamSchema,
         body: createCorrectionBodySchema,
       },
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
     async (request, reply) => {
       const { slug } = request.params;
       const { description, suggestion } = request.body;
-      const userId = request.session.userId!;
+      const userId = request.user!.id;
 
       const asset = await container.knowledgeAssetRepository.findBySlug(slug);
       if (!asset) {
@@ -87,10 +87,10 @@ export async function registerAuthenticatedCorrectionRoutes(
       schema: {
         querystring: paginationQuerySchema,
       },
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
     async (request, _reply) => {
-      const userId = request.session.userId!;
+      const userId = request.user!.id;
       const { page = 1, limit = 20 } = request.query;
 
       const skip = (page - 1) * limit;

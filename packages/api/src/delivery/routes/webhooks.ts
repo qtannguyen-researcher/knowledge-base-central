@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import * as crypto from 'crypto';
-import type { Container } from '../../../container.js';
+import type { Container } from '../../container.js';
 import { enqueueGitSyncJob } from '../../infrastructure/queue/QueueClient.js';
 
 interface GitHubWebhookPayload {

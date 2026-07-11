@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 import { createRelationshipBodySchema } from '../../schemas/relationship.js';
@@ -27,7 +27,7 @@ export async function registerAdminRelationshipRoutes(
   app.post(
     '/relationships',
     {
-      preHandler: requirePermission('article:update', container),
+      preHandler: requirePermission(container, 'article:update'),
       schema: { body: createRelationshipBodySchema },
     },
     async (request, reply) => {
@@ -48,7 +48,7 @@ export async function registerAdminRelationshipRoutes(
           targetType: body.targetType,
           targetId: body.targetId,
           relationship: body.relationship,
-          createdById: request.session.userId ?? null,
+          createdById: request.user?.id ?? null,
         },
       });
 
@@ -59,7 +59,7 @@ export async function registerAdminRelationshipRoutes(
   app.delete(
     '/relationships/:id',
     {
-      preHandler: requirePermission('article:update', container),
+      preHandler: requirePermission(container, 'article:update'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {

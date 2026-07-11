@@ -31,6 +31,19 @@ services:
       timeout: 5s
       retries: 5
 
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    ports:
+      - '${PGADMIN_PORT:-8080}:80'
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    depends_on:
+      - postgres
+    profiles:
+      - dev
+
   mailhog:
     image: mailhog/mailhog:latest
     restart: unless-stopped
@@ -38,7 +51,7 @@ services:
       - '1025:1025'
       - '8025:8025'
     profiles:
-      - dev
+      - staging
 
 volumes:
   postgres_data:

@@ -10,7 +10,7 @@ import { ApiClientError } from './api';
 
 const API_BASE =
   typeof window === 'undefined'
-    ? (process.env['API_URL'] ?? process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001')
+    ? (process.env['API_URL'] ?? process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3002')
     : '';
 
 function adminApiUrl(path: string): string {

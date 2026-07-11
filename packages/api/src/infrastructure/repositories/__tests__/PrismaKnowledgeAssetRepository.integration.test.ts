@@ -5,7 +5,6 @@ import {
   UserRole,
 } from '@knowledge-base-central/shared';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { describe, expect, it } from 'vitest';
 
 import { KnowledgeAsset } from '../../../domain/knowledge-asset/KnowledgeAsset.js';
@@ -23,7 +22,6 @@ describe.skipIf(!databaseUrl)('KnowledgeAsset repository integration', () => {
       create: {
         email: 'integration-test@example.com',
         username: 'integration-test',
-        passwordHash: await bcrypt.hash('test-password', 10),
         role: UserRole.OWNER,
         status: 'ACTIVE',
       },

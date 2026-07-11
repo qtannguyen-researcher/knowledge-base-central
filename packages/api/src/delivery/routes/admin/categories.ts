@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { Category } from '../../../domain/category/Category.js';
 import { idParamSchema } from '../../schemas/common.js';
@@ -14,7 +14,7 @@ export async function registerAdminCategoryRoutes(
 ): Promise<void> {
   app.get(
     '/categories',
-    { preHandler: requirePermission('category:view', container) },
+    { preHandler: requirePermission(container, 'category:view') },
     async () => {
       const categories = await container.categoryRepository.findAll();
       return categories.map((cat) => cat.toProps());
@@ -24,7 +24,7 @@ export async function registerAdminCategoryRoutes(
   app.post(
     '/categories',
     {
-      preHandler: requirePermission('category:create', container),
+      preHandler: requirePermission(container, 'category:create'),
       schema: { body: createCategoryBodySchema },
     },
     async (request, reply) => {
@@ -55,7 +55,7 @@ export async function registerAdminCategoryRoutes(
   app.put(
     '/categories/:id',
     {
-      preHandler: requirePermission('category:update', container),
+      preHandler: requirePermission(container, 'category:update'),
       schema: { params: idParamSchema, body: updateCategoryBodySchema },
     },
     async (request, reply) => {
@@ -90,7 +90,7 @@ export async function registerAdminCategoryRoutes(
   app.delete(
     '/categories/:id',
     {
-      preHandler: requirePermission('category:delete', container),
+      preHandler: requirePermission(container, 'category:delete'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -109,7 +109,7 @@ export async function registerAdminCategoryRoutes(
       }
 
       await container.categoryRepository.delete(existing.id);
-      await container.auditService.log(request.session.userId, 'delete', 'category', existing.id);
+      await container.auditService.log(request.user?.id, 'delete', 'category', existing.id);
       return reply.status(200).send({ ok: true });
     },
   );

@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 
@@ -20,7 +20,7 @@ export async function registerAdminAttachmentRoutes(
   app.post(
     '/assets/:id/attachments',
     {
-      preHandler: requirePermission('attachment:create', container),
+      preHandler: requirePermission(container, 'attachment:create'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -70,7 +70,7 @@ export async function registerAdminAttachmentRoutes(
   app.delete(
     '/attachments/:id',
     {
-      preHandler: requirePermission('attachment:delete', container),
+      preHandler: requirePermission(container, 'attachment:delete'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -83,12 +83,7 @@ export async function registerAdminAttachmentRoutes(
 
       await container.fileStorage.delete(attachment.storagePath);
       await container.prisma.attachment.delete({ where: { id: attachment.id } });
-      await container.auditService.log(
-        request.session.userId,
-        'delete',
-        'attachment',
-        attachment.id,
-      );
+      await container.auditService.log(request.user?.id, 'delete', 'attachment', attachment.id);
 
       return reply.status(200).send({ ok: true });
     },

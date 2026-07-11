@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 import {
@@ -15,7 +15,7 @@ export async function registerAdminLearningPathRoutes(
 ): Promise<void> {
   app.get(
     '/learning-paths',
-    { preHandler: requirePermission('learning-path:view', container) },
+    { preHandler: requirePermission(container, 'learning-path:view') },
     async () => {
       const paths = await container.prisma.learningPath.findMany({
         orderBy: { title: 'asc' },
@@ -26,7 +26,7 @@ export async function registerAdminLearningPathRoutes(
 
   app.get(
     '/learning-paths/:id',
-    { preHandler: requirePermission('learning-path:view', container) },
+    { preHandler: requirePermission(container, 'learning-path:view') },
     async (request, reply) => {
       const path = await container.prisma.learningPath.findUnique({
         where: { id: request.params.id },
@@ -47,7 +47,7 @@ export async function registerAdminLearningPathRoutes(
   app.post(
     '/learning-paths',
     {
-      preHandler: requirePermission('learning-path:create', container),
+      preHandler: requirePermission(container, 'learning-path:create'),
       schema: { body: createLearningPathBodySchema },
     },
     async (request, reply) => {
@@ -59,7 +59,7 @@ export async function registerAdminLearningPathRoutes(
           description: body.description ?? null,
           difficulty: body.difficulty ?? null,
           estimatedDuration: body.estimatedDuration ?? null,
-          createdById: request.session.userId ?? null,
+          createdById: request.user?.id ?? null,
           items: {
             create: body.assetIds.map((assetId, index) => ({
               assetId,
@@ -76,7 +76,7 @@ export async function registerAdminLearningPathRoutes(
   app.put(
     '/learning-paths/:id',
     {
-      preHandler: requirePermission('learning-path:update', container),
+      preHandler: requirePermission(container, 'learning-path:update'),
       schema: { params: idParamSchema, body: updateLearningPathBodySchema },
     },
     async (request, reply) => {
@@ -105,7 +105,7 @@ export async function registerAdminLearningPathRoutes(
   app.put(
     '/learning-paths/:id/items',
     {
-      preHandler: requirePermission('learning-path:update', container),
+      preHandler: requirePermission(container, 'learning-path:update'),
       schema: { params: idParamSchema, body: reorderLearningPathItemsBodySchema },
     },
     async (request, reply) => {
@@ -140,7 +140,7 @@ export async function registerAdminLearningPathRoutes(
   app.delete(
     '/learning-paths/:id',
     {
-      preHandler: requirePermission('learning-path:delete', container),
+      preHandler: requirePermission(container, 'learning-path:delete'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -150,7 +150,7 @@ export async function registerAdminLearningPathRoutes(
         });
         await container.prisma.learningPath.delete({ where: { id: request.params.id } });
         await container.auditService.log(
-          request.session.userId,
+          request.user?.id,
           'delete',
           'learning_path',
           request.params.id,

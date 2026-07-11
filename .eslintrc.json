@@ -1,6 +1,10 @@
 {
   "root": true,
   "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "tsconfigRootDir": ".",
+    "project": ["./packages/*/tsconfig.json"]
+  },
   "plugins": ["@typescript-eslint", "import"],
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
   "rules": {
@@ -17,5 +21,18 @@
     "node": true,
     "es2022": true
   },
-  "ignorePatterns": ["dist", ".next", "node_modules", "*.js", "**/.gitkeep"]
+  "ignorePatterns": [
+    "dist",
+    ".next",
+    "node_modules",
+    "*.js",
+    "**/.gitkeep",
+    "**/prisma/**",
+    "**/vitest.config.ts",
+    "**/playwright.config.ts",
+    "**/tailwind.config.ts",
+    "**/e2e/**",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
 }

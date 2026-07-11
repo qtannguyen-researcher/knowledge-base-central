@@ -7,7 +7,6 @@ import type {
   LearningPath,
   LearningPathDetail,
   PaginatedResponse,
-  PublicUser,
   Relationship,
   SearchResponse,
   Tag,
@@ -15,7 +14,7 @@ import type {
 
 const API_BASE =
   typeof window === 'undefined'
-    ? (process.env['API_URL'] ?? process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001')
+    ? (process.env['API_URL'] ?? process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3002')
     : '';
 
 function apiUrl(path: string): string {
@@ -144,68 +143,6 @@ export async function search(params: SearchParams): Promise<SearchResponse> {
   if (params.difficulty) searchParams.set('difficulty', params.difficulty);
   if (params.contentType) searchParams.set('contentType', params.contentType);
   return fetchJson(`/search?${searchParams.toString()}`);
-}
-
-function authUrl(path: string): string {
-  const normalized = path.startsWith('/') ? path : `/${path}`;
-  if (API_BASE) {
-    return `${API_BASE}${normalized}`;
-  }
-  return normalized;
-}
-
-interface FetchAuthOptions extends RequestInit {
-  serverCookies?: string;
-}
-
-async function fetchAuthJson<T>(path: string, init?: FetchAuthOptions): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(init?.serverCookies ? { Cookie: init.serverCookies } : {}),
-    ...init?.headers,
-  };
-  const response = await fetch(authUrl(path), {
-    ...init,
-    headers,
-    credentials: init?.serverCookies ? 'omit' : 'include',
-  });
-
-  if (!response.ok) {
-    let errorCode = 'unknown';
-    let errorMessage: string | undefined;
-    try {
-      const body = (await response.json()) as ApiError;
-      errorCode = body.error ?? 'unknown';
-      errorMessage = body.message;
-    } catch {
-      // ignore parse errors
-    }
-    throw new ApiClientError(response.status, errorCode, errorMessage);
-  }
-
-  return response.json() as Promise<T>;
-}
-
-export async function login(email: string, password: string): Promise<{ user: PublicUser }> {
-  return fetchAuthJson('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-}
-
-export async function register(
-  email: string,
-  username: string,
-  password: string,
-): Promise<{ id: string; email: string; username: string }> {
-  return fetchAuthJson('/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, username, password }),
-  });
-}
-
-export async function getCurrentUser(options?: { serverCookies?: string }): Promise<PublicUser> {
-  return fetchAuthJson('/auth/me', options);
 }
 
 export async function getAllAssetSlugs(): Promise<string[]> {

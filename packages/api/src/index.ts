@@ -54,93 +54,15 @@ process.on('uncaughtException', (error: Error) => {
 });
 
 process.on('unhandledRejection', (reason: unknown, _promise: Promise<unknown>) => {
-  const stack = new Error().stack;
-  logger.fatal({ reason, stack }, 'Unhandled rejection');
-  // #region agent log
-  fetch('http://127.0.0.1:7376/ingest/ef960bb0-626c-4cf7-93ad-5d088341a8ff', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9936d' },
-    body: JSON.stringify({
-      sessionId: 'a9936d',
-      location: 'index.ts:57',
-      message: 'Unhandled rejection',
-      data: { reason: JSON.stringify(reason), reasonType: typeof reason, stack },
-      runId: 'initial',
-      hypothesisId: 'B',
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
+  logger.fatal({ reason }, 'Unhandled rejection');
   gracefulShutdown('unhandledRejection').catch(() => process.exit(1));
 });
 
 const start = async (): Promise<void> => {
-  // #region agent log
-  fetch('http://127.0.0.1:7376/ingest/ef960bb0-626c-4cf7-93ad-5d088341a8ff', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9936d' },
-    body: JSON.stringify({
-      sessionId: 'a9936d',
-      location: 'index.ts:63',
-      message: 'start called',
-      data: {},
-      runId: 'initial',
-      hypothesisId: 'A',
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   server = await buildServer();
 
-  // #region agent log
-  fetch('http://127.0.0.1:7376/ingest/ef960bb0-626c-4cf7-93ad-5d088341a8ff', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9936d' },
-    body: JSON.stringify({
-      sessionId: 'a9936d',
-      location: 'index.ts:67',
-      message: 'buildServer completed, about to listen',
-      data: { serverType: server?.constructor.name },
-      runId: 'initial',
-      hypothesisId: 'C',
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7376/ingest/ef960bb0-626c-4cf7-93ad-5d088341a8ff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9936d' },
-      body: JSON.stringify({
-        sessionId: 'a9936d',
-        location: 'index.ts:70',
-        message: 'before server.listen',
-        data: { port: config.PORT },
-        runId: 'initial',
-        hypothesisId: 'C',
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     await server.listen({ port: config.PORT, host: '0.0.0.0' });
-    // #region agent log
-    fetch('http://127.0.0.1:7376/ingest/ef960bb0-626c-4cf7-93ad-5d088341a8ff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9936d' },
-      body: JSON.stringify({
-        sessionId: 'a9936d',
-        location: 'index.ts:72',
-        message: 'server.listen completed',
-        data: {},
-        runId: 'initial',
-        hypothesisId: 'C',
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     logger.info({ port: config.PORT }, 'Server listening');
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
@@ -148,4 +70,7 @@ const start = async (): Promise<void> => {
   }
 };
 
-start();
+start().catch((err) => {
+  logger.fatal({ err }, 'Unhandled error in start()');
+  process.exit(1);
+});

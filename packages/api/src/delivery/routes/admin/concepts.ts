@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 import { createConceptBodySchema, updateConceptBodySchema } from '../../schemas/concept.js';
@@ -11,7 +11,7 @@ export async function registerAdminConceptRoutes(
 ): Promise<void> {
   app.get(
     '/concepts',
-    { preHandler: requirePermission('concept:view', container) },
+    { preHandler: requirePermission(container, 'concept:view') },
     async (request, reply) => {
       const page = parseInt(String(request.query['page'] ?? '1'), 10);
       const limit = parseInt(String(request.query['limit'] ?? '50'), 10);
@@ -31,7 +31,7 @@ export async function registerAdminConceptRoutes(
   app.post(
     '/concepts',
     {
-      preHandler: requirePermission('concept:create', container),
+      preHandler: requirePermission(container, 'concept:create'),
       schema: { body: createConceptBodySchema },
     },
     async (request, reply) => {
@@ -52,7 +52,7 @@ export async function registerAdminConceptRoutes(
   app.put(
     '/concepts/:id',
     {
-      preHandler: requirePermission('concept:update', container),
+      preHandler: requirePermission(container, 'concept:update'),
       schema: { params: idParamSchema, body: updateConceptBodySchema },
     },
     async (request, reply) => {
@@ -78,7 +78,7 @@ export async function registerAdminConceptRoutes(
   app.delete(
     '/concepts/:id',
     {
-      preHandler: requirePermission('concept:delete', container),
+      preHandler: requirePermission(container, 'concept:delete'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -87,12 +87,7 @@ export async function registerAdminConceptRoutes(
           where: { conceptId: request.params.id },
         });
         await container.prisma.concept.delete({ where: { id: request.params.id } });
-        await container.auditService.log(
-          request.session.userId,
-          'delete',
-          'concept',
-          request.params.id,
-        );
+        await container.auditService.log(request.user?.id, 'delete', 'concept', request.params.id);
         return reply.status(200).send({ ok: true });
       } catch {
         return reply.status(404).send({ error: 'not_found' });

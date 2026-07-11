@@ -7,15 +7,12 @@ loadEnv({ path: envPath });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3001),
+  PORT: z.coerce.number().int().positive().default(3002),
   DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
   REDIS_URL: z.string().url('REDIS_URL must be a valid URL'),
-  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
+  IDENTITY_SERVICE_URL: z.string().url('IDENTITY_SERVICE_URL must be a valid URL'),
+  IDENTITY_PUBLIC_KEY: z.string().min(1, 'IDENTITY_PUBLIC_KEY must be set'),
   METRICS_TOKEN: z.string().optional(),
-  GITHUB_CLIENT_ID: z.string().optional(),
-  GITHUB_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
   GIT_REPO_PATH: z.string().min(1, 'GIT_REPO_PATH must be set'),
   GIT_REPO_URL: z.string().optional(),
   GITHUB_WEBHOOK_SECRET: z.string().optional(),

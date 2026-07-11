@@ -1,7 +1,7 @@
 import type { ZodFastify } from '../../types.js';
 import { z } from 'zod';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { enqueueGitSyncJob } from '../../../infrastructure/queue/QueueClient.js';
 
@@ -26,7 +26,7 @@ export async function registerAdminGitSyncRoutes(
   app.post(
     '/git-sync/trigger',
     {
-      preHandler: requirePermission('repository:sync', container),
+      preHandler: requirePermission(container, 'repository:sync'),
       schema: { body: triggerSyncBodySchema },
     },
     async (request, reply) => {
@@ -47,7 +47,7 @@ export async function registerAdminGitSyncRoutes(
   app.get(
     '/git-sync/jobs',
     {
-      preHandler: requirePermission('repository:sync', container),
+      preHandler: requirePermission(container, 'repository:sync'),
       schema: {
         querystring: paginationSchema,
       },
@@ -78,7 +78,7 @@ export async function registerAdminGitSyncRoutes(
   app.get(
     '/git-sync/jobs/:id',
     {
-      preHandler: requirePermission('repository:sync', container),
+      preHandler: requirePermission(container, 'repository:sync'),
       schema: {
         params: jobIdParamSchema,
       },

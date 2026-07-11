@@ -3,7 +3,7 @@ import type { ZodFastify } from '../../types.js';
 import type { Container } from '../../../container.js';
 import { commentIdParamSchema } from '../../schemas/community.js';
 import { CommentStatus } from '@knowledge-base-central/shared';
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 
 export async function registerAdminCommentRoutes(
   app: ZodFastify,
@@ -11,7 +11,7 @@ export async function registerAdminCommentRoutes(
 ): Promise<void> {
   app.get(
     '/comments/pending',
-    { preHandler: requirePermission('comment:moderate', container) },
+    { preHandler: requirePermission(container, 'comment:moderate') },
     async (request, _reply) => {
       const page = parseInt(String(request.query['page'] ?? '1'), 10);
       const limit = parseInt(String(request.query['limit'] ?? '20'), 10);
@@ -43,7 +43,7 @@ export async function registerAdminCommentRoutes(
     '/comments/:id',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('comment:moderate', container),
+      preHandler: requirePermission(container, 'comment:moderate'),
     },
     async (request, _reply) => {
       const { id } = request.params;
@@ -63,7 +63,7 @@ export async function registerAdminCommentRoutes(
     '/comments/:id/approve',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('comment:moderate', container),
+      preHandler: requirePermission(container, 'comment:moderate'),
     },
     async (request, _reply) => {
       const { id } = request.params;
@@ -89,7 +89,7 @@ export async function registerAdminCommentRoutes(
     '/comments/:id/reject',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('comment:moderate', container),
+      preHandler: requirePermission(container, 'comment:moderate'),
     },
     async (request, _reply) => {
       const { id } = request.params;

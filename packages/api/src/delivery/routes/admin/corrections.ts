@@ -6,7 +6,7 @@ import {
   listCorrectionsQuerySchema,
   correctionReviewBodySchema,
 } from '../../schemas/community.js';
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 
 export async function registerAdminCorrectionRoutes(
   app: ZodFastify,
@@ -18,7 +18,7 @@ export async function registerAdminCorrectionRoutes(
       schema: {
         querystring: listCorrectionsQuerySchema,
       },
-      preHandler: requirePermission('correction:view', container),
+      preHandler: requirePermission(container, 'correction:view'),
     },
     async (request, _reply) => {
       const { page = 1, limit = 20, status, assetId } = request.query;
@@ -66,9 +66,9 @@ export async function registerAdminCorrectionRoutes(
     '/corrections/:id',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('correction:view', container),
+      preHandler: requirePermission(container, 'correction:view'),
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const { id } = request.params;
 
       const correction = await container.correctionRepository.findById(id);
@@ -103,11 +103,11 @@ export async function registerAdminCorrectionRoutes(
     '/corrections/:id/review',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('correction:approve', container),
+      preHandler: requirePermission(container, 'correction:approve'),
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const { id } = request.params;
-      const reviewerId = request.session.userId!;
+      const reviewerId = request.user!.id;
 
       const correction = await container.correctionRepository.findById(id);
       if (!correction) {
@@ -138,11 +138,11 @@ export async function registerAdminCorrectionRoutes(
     '/corrections/:id/accept',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('correction:approve', container),
+      preHandler: requirePermission(container, 'correction:approve'),
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const { id } = request.params;
-      const reviewerId = request.session.userId!;
+      const reviewerId = request.user!.id;
 
       const correction = await container.correctionRepository.findById(id);
       if (!correction) {
@@ -169,12 +169,12 @@ export async function registerAdminCorrectionRoutes(
     '/corrections/:id/reject',
     {
       schema: { params: commentIdParamSchema, body: correctionReviewBodySchema },
-      preHandler: requirePermission('correction:reject', container),
+      preHandler: requirePermission(container, 'correction:reject'),
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const { id } = request.params;
       const { reason } = request.body || {};
-      const reviewerId = request.session.userId!;
+      const reviewerId = request.user!.id;
 
       const correction = await container.correctionRepository.findById(id);
       if (!correction) {
@@ -202,11 +202,11 @@ export async function registerAdminCorrectionRoutes(
     '/corrections/:id/implement',
     {
       schema: { params: commentIdParamSchema },
-      preHandler: requirePermission('correction:approve', container),
+      preHandler: requirePermission(container, 'correction:approve'),
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const { id } = request.params;
-      const reviewerId = request.session.userId!;
+      const reviewerId = request.user!.id;
 
       const correction = await container.correctionRepository.findById(id);
       if (!correction) {

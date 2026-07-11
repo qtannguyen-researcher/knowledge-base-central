@@ -11,8 +11,6 @@ import type { IGitAdapter } from './domain/git-sync/IGitAdapter.js';
 import type { ITagRepository } from './domain/tag/ITagRepository.js';
 import type { IKnowledgeAssetRepository } from './domain/knowledge-asset/IKnowledgeAssetRepository.js';
 import type { ISearchRepository } from './domain/search/ISearchRepository.js';
-import type { IUserRepository } from './domain/user/IUserRepository.js';
-import type { IOAuthAccountRepository } from './domain/user/IOAuthAccountRepository.js';
 
 import { prisma } from './infrastructure/db/prisma.js';
 import { PrismaCategoryRepository } from './infrastructure/repositories/PrismaCategoryRepository.js';
@@ -22,19 +20,16 @@ import { PrismaGitSyncRepository } from './infrastructure/repositories/PrismaGit
 import { PrismaKnowledgeAssetRepository } from './infrastructure/repositories/PrismaKnowledgeAssetRepository.js';
 import { PostgresFTSRepository } from './infrastructure/search/PostgresFTSRepository.js';
 import { TypesenseSearchRepository } from './infrastructure/search/TypesenseSearchRepository.js';
-import { PrismaOAuthAccountRepository } from './infrastructure/repositories/PrismaOAuthAccountRepository.js';
-import { PrismaUserRepository } from './infrastructure/repositories/PrismaUserRepository.js';
 import { PrismaTagRepository } from './infrastructure/repositories/PrismaTagRepository.js';
 import { IsomorphicGitAdapter } from './infrastructure/git/IsomorphicGitAdapter.js';
 import { FileStorage } from './infrastructure/storage/FileStorage.js';
 import { NotificationService } from './application/notification/NotificationService.js';
+import { IdentityServiceClient } from '@identity-service/contracts';
 
 export interface Container {
   prisma: PrismaClient;
   knowledgeAssetRepository: IKnowledgeAssetRepository;
   categoryRepository: ICategoryRepository;
-  userRepository: IUserRepository;
-  oauthAccountRepository: IOAuthAccountRepository;
   searchRepository: ISearchRepository;
   gitSyncRepository: IGitSyncRepository;
   gitAdapter: IGitAdapter;
@@ -45,6 +40,8 @@ export interface Container {
   commentRepository: ICommentRepository;
   correctionRepository: ICorrectionRepository;
   notificationService: INotificationService;
+  identityServiceClient: IdentityServiceClient;
+  identityPublicKey: string;
 }
 
 function buildSearchRepository(db: PrismaClient): ISearchRepository {
@@ -56,14 +53,33 @@ function buildSearchRepository(db: PrismaClient): ISearchRepository {
 }
 
 let containerInstance: Container | null = null;
+let containerOptions: { identityServiceUrl?: string; identityPublicKey?: string } = {};
+
+export function configureContainer(options: {
+  identityServiceUrl?: string;
+  identityPublicKey?: string;
+}): void {
+  containerOptions = options;
+}
 
 export function createContainer(db: PrismaClient = prisma): Container {
+  const identityServiceUrl =
+    containerOptions.identityServiceUrl ?? process.env['IDENTITY_SERVICE_URL'];
+  const identityPublicKey =
+    containerOptions.identityPublicKey ?? process.env['IDENTITY_PUBLIC_KEY'] ?? '';
+
+  const identityServiceClient = identityServiceUrl
+    ? new IdentityServiceClient({
+        baseUrl: identityServiceUrl,
+        timeoutMs: 5000,
+        retryAttempts: 5,
+      })
+    : new IdentityServiceClient({ baseUrl: 'http://localhost:3000' });
+
   return {
     prisma: db,
     knowledgeAssetRepository: new PrismaKnowledgeAssetRepository(db),
     categoryRepository: new PrismaCategoryRepository(db),
-    userRepository: new PrismaUserRepository(db),
-    oauthAccountRepository: new PrismaOAuthAccountRepository(db),
     searchRepository: buildSearchRepository(db),
     gitSyncRepository: new PrismaGitSyncRepository(db),
     gitAdapter: new IsomorphicGitAdapter(),
@@ -74,6 +90,8 @@ export function createContainer(db: PrismaClient = prisma): Container {
     commentRepository: new PrismaCommentRepository(db),
     correctionRepository: new PrismaCorrectionRepository(db),
     notificationService: new NotificationService(db),
+    identityServiceClient,
+    identityPublicKey,
   };
 }
 

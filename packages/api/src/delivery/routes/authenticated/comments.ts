@@ -5,7 +5,7 @@ import type { Container } from '../../../container.js';
 import { slugParamSchema } from '../../schemas/common.js';
 import { createCommentBodySchema } from '../../schemas/community.js';
 import { CommentStatus } from '@knowledge-base-central/shared';
-import { requireAuth } from '../../../auth/middleware.js';
+import { requireAuth } from '../../../auth.js';
 import { sanitizeText } from '../../../infrastructure/sanitization/textSanitizer.js';
 
 const COMMENT_RATE_LIMIT_WINDOW = 60 * 60 * 1000;
@@ -22,12 +22,12 @@ export async function registerAuthenticatedCommentRoutes(
         params: slugParamSchema,
         body: createCommentBodySchema,
       },
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
     async (request, reply) => {
       const { slug } = request.params;
       const { content, parentId } = request.body;
-      const userId = request.session.userId!;
+      const userId = request.user!.id;
 
       const asset = await container.knowledgeAssetRepository.findBySlug(slug);
       if (!asset) {
@@ -89,7 +89,7 @@ export async function registerAuthenticatedCommentRoutes(
       schema: {
         params: slugParamSchema.extend({ id: z.string().uuid() }),
       },
-      preHandler: requireAuth(),
+      preHandler: requireAuth(container),
     },
     async (request, reply) => {
       const { slug, id } = request.params;

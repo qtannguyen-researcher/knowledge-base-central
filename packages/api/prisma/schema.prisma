@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["views"]
 }
 
 datasource db {
@@ -9,6 +10,8 @@ datasource db {
 
 // ============================================================================
 // USERS & AUTH
+// Note: User authentication is delegated to identity-service.
+// This User model tracks local user references (for relationships, authorship, etc.)
 // ============================================================================
 
 model User {
@@ -16,23 +19,21 @@ model User {
   email        String     @unique
   username     String     @unique
   displayName  String?    @map("display_name")
-  passwordHash String?    @map("password_hash")
   role         UserRole   @default(CONTRIBUTOR)
   status       UserStatus @default(ACTIVE)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
-  oauthAccounts      OAuthAccount[]
-  sessions           Session[]
+  oauthAccounts       OAuthAccount[]
   knowledgeAssets    KnowledgeAsset[]
   comments           Comment[]
   correctionRequests CorrectionRequest[] @relation("CorrectionSubmitter")
   reviewedCorrections CorrectionRequest[] @relation("CorrectionReviewer")
   createdRelationships Relationship[]     @relation("RelationshipCreator")
   learningPaths      LearningPath[]
-  auditEvents        AuditEvent[]
   notifications      Notification[]
-  assetVersions      AssetVersion[]
+  assetVersions     AssetVersion[]
+  auditEvents       AuditEvent[]
 
   @@map("users")
 }
@@ -49,15 +50,49 @@ model OAuthAccount {
   @@map("oauth_accounts")
 }
 
-model Session {
-  id        String   @id
+// Read-only view of identity tables owned by Identity Service
+// Prisma will not attempt to migrate or mutate this view
+view UserReadView {
+  id           String    @map("id")
+  email        String
+  username     String
+  displayName  String?   @map("display_name")
+  role         UserRole
+  status       UserStatus
+  createdAt    DateTime  @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @map("updated_at") @db.Timestamptz
+
+  @@map("users_readonly_view")
+}
+
+view OAuthAccountReadView {
+  id         String @map("id")
+  userId     String @map("user_id") @db.Uuid
+  provider   String
+  providerId String @map("provider_id")
+
+  @@map("oauth_accounts_readonly_view")
+}
+
+view SessionReadView {
+  id        String   @map("id")
   userId    String   @map("user_id") @db.Uuid
   expiresAt DateTime @map("expires_at") @db.Timestamptz
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt DateTime @map("created_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("sessions_readonly_view")
+}
 
-  @@map("sessions")
+view AuditEventReadView {
+  id         String   @map("id")
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id") @db.Uuid
+  payload    Json?
+  createdAt  DateTime @map("created_at") @db.Timestamptz
+
+  @@map("audit_events_readonly_view")
 }
 
 // ============================================================================

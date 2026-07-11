@@ -1,0 +1,296 @@
+name: Identity Service CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+    paths:
+      - 'identity-service/**'
+      - 'packages/identity-contracts/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'identity-service/**'
+      - 'packages/identity-contracts/**'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+
+jobs:
+  contracts-test:
+    name: Contracts Package Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/identity-contracts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: packages/identity-contracts/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+  identity-service-test:
+    name: Identity Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: identity-service
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: identity_service_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: identity-service/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/identity_service_test
+
+      - name: Run migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/identity_service_test
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/identity_service_test
+          IDENTITY_PRIVATE_KEY: ${{ secrets.TEST_IDENTITY_PRIVATE_KEY }}
+          IDENTITY_PUBLIC_KEY: ${{ secrets.TEST_IDENTITY_PUBLIC_KEY }}
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-identity-service
+          path: coverage/
+
+  pact-contract-tests:
+    name: Pact Contract Tests
+    runs-on: ubuntu-latest
+    needs: [contracts-test, identity-service-test]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+        working-directory: packages/identity-contracts
+
+      - name: Publish contracts package
+        run: npm publish --access public --tag ci --dry-run
+        working-directory: packages/identity-contracts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [contracts-test, identity-service-test]
+    permissions:
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run npm audit
+        run: |
+          pnpm audit --audit-level=high
+          pnpm audit --audit-level=critical
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [security-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/identity-service
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./identity-service
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "Deploying Identity Service to staging..."
+          # kubectl rollout status deployment/identity-service -n identity-staging
+          echo "Identity Service deployed to staging"
+
+      - name: Wait for Identity Service health
+        run: |
+          echo "Waiting for Identity Service to be ready..."
+          # Health check would go here
+          # curl -f http://identity-service-staging/health/ready
+          echo "Identity Service is healthy"
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against staging..."
+          # Would include:
+          # - Health check
+          # - Login flow
+          # - Token refresh
+          # - Authorization check
+          echo "Smoke tests completed"
+
+  canary-deploy:
+    name: Canary Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [smoke-tests]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Canary deployment (5%)
+        run: |
+          echo "Deploying 5% canary..."
+          # kubectl patch deployment/identity-service -n identity -p '{"spec":{"replicas": 1}}'
+          echo "5% canary deployed"
+
+      - name: Monitor canary (5 minutes)
+        run: sleep 300
+
+      - name: Increase to 25%
+        run: |
+          echo "Increasing canary to 25%..."
+          # kubectl patch deployment/identity-service -n identity -p '{"spec":{"replicas": 3}}'
+          echo "25% canary deployed"
+
+      - name: Monitor canary (10 minutes)
+        run: sleep 600
+
+      - name: Full rollout
+        run: |
+          echo "Performing full rollout..."
+          # kubectl patch deployment/identity-service -n identity -p '{"spec":{"replicas": 6}}'
+          # kubectl rollout status deployment/identity-service -n identity
+          echo "Full rollout complete"

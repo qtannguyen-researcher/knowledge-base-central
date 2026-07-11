@@ -6,7 +6,6 @@ import {
   UserRole,
 } from '@knowledge-base-central/shared';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 import { Comment } from '../../../domain/community/Comment.js';
@@ -27,14 +26,11 @@ describe.skipIf(!databaseUrl)('Community features integration', () => {
   let testAsset: { id: string; slug: string; authorId: string | null };
 
   beforeAll(async () => {
-    const passwordHash = await bcrypt.hash('test-password', 10);
-
     testUser = await db.user.upsert({
       where: { email: 'comment-test-user@example.com' },
       create: {
         email: 'comment-test-user@example.com',
         username: 'comment-test-user',
-        passwordHash,
         role: UserRole.CONTRIBUTOR,
         status: 'ACTIVE',
       },
@@ -46,7 +42,6 @@ describe.skipIf(!databaseUrl)('Community features integration', () => {
       create: {
         email: 'comment-test-admin@example.com',
         username: 'comment-test-admin',
-        passwordHash,
         role: UserRole.ADMIN,
         status: 'ACTIVE',
       },

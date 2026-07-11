@@ -17,7 +17,7 @@ const nextConfig = {
   // Proxy /api/* requests to the local Fastify API service during development.
   // In production, set NEXT_PUBLIC_API_URL or configure your reverse proxy.
   async rewrites() {
-    const apiUrl = process.env.API_URL ?? 'http://localhost:3001';
+    const apiUrl = process.env.API_URL ?? 'http://localhost:3002';
     return [
       {
         source: '/api/:path*',
@@ -33,7 +33,7 @@ const nextConfig = {
   // Expose the API base URL to the browser bundle (optional; useful for
   // client-side fetch calls that don't go through the rewrite proxy).
   env: {
-    NEXT_PUBLIC_API_URL: process.env.API_URL ?? 'http://localhost:3001',
+    NEXT_PUBLIC_API_URL: process.env.API_URL ?? 'http://localhost:3002',
   },
 
   // Security headers.

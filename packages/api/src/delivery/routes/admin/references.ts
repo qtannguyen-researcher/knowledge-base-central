@@ -2,7 +2,7 @@ import { KnowledgeAssetStatus } from '@knowledge-base-central/shared';
 import { Prisma } from '@prisma/client';
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 import { createReferenceBodySchema, updateReferenceBodySchema } from '../../schemas/reference.js';
@@ -13,7 +13,7 @@ export async function registerAdminReferenceRoutes(
 ): Promise<void> {
   app.get(
     '/references',
-    { preHandler: requirePermission('reference:view', container) },
+    { preHandler: requirePermission(container, 'reference:view') },
     async (request, _reply) => {
       const page = parseInt(String(request.query['page'] ?? '1'), 10);
       const limit = parseInt(String(request.query['limit'] ?? '20'), 10);
@@ -33,10 +33,10 @@ export async function registerAdminReferenceRoutes(
   app.post(
     '/references',
     {
-      preHandler: requirePermission('reference:create', container),
+      preHandler: requirePermission(container, 'reference:create'),
       schema: { body: createReferenceBodySchema },
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const body = request.body;
       const reference = await container.prisma.reference.create({
         data: {
@@ -58,10 +58,10 @@ export async function registerAdminReferenceRoutes(
   app.put(
     '/references/:id',
     {
-      preHandler: requirePermission('reference:update', container),
+      preHandler: requirePermission(container, 'reference:update'),
       schema: { params: idParamSchema, body: updateReferenceBodySchema },
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       try {
         const body = request.body;
         const reference = await container.prisma.reference.update({
@@ -95,10 +95,10 @@ export async function registerAdminReferenceRoutes(
   app.delete(
     '/references/:id',
     {
-      preHandler: requirePermission('reference:delete', container),
+      preHandler: requirePermission(container, 'reference:delete'),
       schema: { params: idParamSchema },
     },
-    async (request, _reply) => {
+    async (request, reply) => {
       const links = await container.prisma.knowledgeAssetReference.findMany({
         where: { referenceId: request.params.id },
         include: { asset: true },
@@ -117,7 +117,7 @@ export async function registerAdminReferenceRoutes(
         });
         await container.prisma.reference.delete({ where: { id: request.params.id } });
         await container.auditService.log(
-          request.session.userId,
+          request.user?.id,
           'delete',
           'reference',
           request.params.id,

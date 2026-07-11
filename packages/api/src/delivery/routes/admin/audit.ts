@@ -1,6 +1,6 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { listAuditQuerySchema } from '../../schemas/audit.js';
 
@@ -11,7 +11,7 @@ export async function registerAdminAuditRoutes(
   app.get(
     '/audit',
     {
-      preHandler: requirePermission('audit:view', container),
+      preHandler: requirePermission(container, 'audit:view'),
       schema: { querystring: listAuditQuerySchema },
     },
     async (request) => {

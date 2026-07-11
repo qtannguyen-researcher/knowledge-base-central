@@ -1,7 +1,7 @@
 import type { ZodFastify } from '../../types.js';
 import { z } from 'zod';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 import { UserRole } from '@knowledge-base-central/shared';
@@ -13,7 +13,7 @@ export async function registerAdminUserRoutes(
   app: ZodFastify,
   container: Container,
 ): Promise<void> {
-  app.get('/users', { preHandler: requirePermission('user:view', container) }, async () => {
+  app.get('/users', { preHandler: requirePermission(container, 'user:view') }, async () => {
     const users = await container.prisma.user.findMany({
       select: {
         id: true,
@@ -36,7 +36,7 @@ export async function registerAdminUserRoutes(
   app.put(
     '/users/:id/role',
     {
-      preHandler: requirePermission('user:update', container),
+      preHandler: requirePermission(container, 'user:update'),
       schema: { params: idParamSchema, body: updateRoleBodySchema },
     },
     async (request, reply) => {
@@ -64,7 +64,7 @@ export async function registerAdminUserRoutes(
   app.put(
     '/users/:id/status',
     {
-      preHandler: requirePermission('user:update', container),
+      preHandler: requirePermission(container, 'user:update'),
       schema: { params: idParamSchema, body: updateStatusBodySchema },
     },
     async (request, reply) => {

@@ -1,12 +1,12 @@
 import type { ZodFastify } from '../../types.js';
 
-import { requirePermission } from '../../../auth/middleware.js';
+import { requirePermission } from '../../../auth.js';
 import type { Container } from '../../../container.js';
 import { idParamSchema } from '../../schemas/common.js';
 import { createTagBodySchema, updateTagBodySchema } from '../../schemas/tag.js';
 
 export async function registerAdminTagRoutes(app: ZodFastify, container: Container): Promise<void> {
-  app.get('/tags', { preHandler: requirePermission('tag:view', container) }, async () => {
+  app.get('/tags', { preHandler: requirePermission(container, 'tag:view') }, async () => {
     const tags = await container.prisma.tag.findMany({
       orderBy: { name: 'asc' },
     });
@@ -16,7 +16,7 @@ export async function registerAdminTagRoutes(app: ZodFastify, container: Contain
   app.post(
     '/tags',
     {
-      preHandler: requirePermission('tag:create', container),
+      preHandler: requirePermission(container, 'tag:create'),
       schema: { body: createTagBodySchema },
     },
     async (request, reply) => {
@@ -31,7 +31,7 @@ export async function registerAdminTagRoutes(app: ZodFastify, container: Contain
   app.put(
     '/tags/:id',
     {
-      preHandler: requirePermission('tag:update', container),
+      preHandler: requirePermission(container, 'tag:update'),
       schema: { params: idParamSchema, body: updateTagBodySchema },
     },
     async (request, reply) => {
@@ -50,7 +50,7 @@ export async function registerAdminTagRoutes(app: ZodFastify, container: Contain
   app.delete(
     '/tags/:id',
     {
-      preHandler: requirePermission('tag:delete', container),
+      preHandler: requirePermission(container, 'tag:delete'),
       schema: { params: idParamSchema },
     },
     async (request, reply) => {
@@ -59,12 +59,7 @@ export async function registerAdminTagRoutes(app: ZodFastify, container: Contain
           where: { tagId: request.params.id },
         });
         await container.prisma.tag.delete({ where: { id: request.params.id } });
-        await container.auditService.log(
-          request.session.userId,
-          'delete',
-          'tag',
-          request.params.id,
-        );
+        await container.auditService.log(request.user?.id, 'delete', 'tag', request.params.id);
         return reply.status(200).send({ ok: true });
       } catch {
         return reply.status(404).send({ error: 'not_found' });
